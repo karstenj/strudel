@@ -1,0 +1,43 @@
+/* 
+Based on the idea by J Simon van der Walt https://mastodon.social/@tedthetrumpet@post.lurk.org/109721763637293396
+
+Generates a random melodic walk with a constrained choice of intervals.
+*/
+
+/* This class holds the current rwalk state */
+class RWalkState {
+  constructor(start,low,high,steps) {
+    this.value = start;
+    this.prev_value1 = start;
+    this.prev_value2 = start;
+    this.low = low;
+    this.high = high;
+    this.steps = steps;
+  }
+  /* step note by diff */
+  step(diff) {
+    this.prev_value2 = this.prev_value1;
+    this.prev_value1 = this.value;
+    this.value = Math.min(Math.max(this.value+diff, this.low), this.high);
+  }
+  /* returns current note value if the value is not equal to the two previous ones */
+  get() {
+    return this.value != this.prev_value1 && this.value != this.prev_value2 ? this.value : undefined;
+  }
+}
+
+const _choose = (x, s) => {
+  const i = Math.trunc(x * s.steps.length * 2);
+  const d = s.steps[i % 2] * (i < s.steps.length ? 1 : -1);
+  s.step(d);
+  //console.log('_choose x='+x+' s.value='+s.value+' d='+d+' i='+i);
+  return s.get()
+};
+const _rwalk = (s) => rand.fmap((x) => _choose(x,s));
+
+/* continuous pattern generator with random walk steps */
+const rwalk = (start,low,high,steps) => {
+  return reify(new RWalkState(start,low,high,steps)).fmap(_rwalk).innerJoin();
+}
+
+rwalk(48,48,72,[2,5]).struct("x!8").note().piano()
