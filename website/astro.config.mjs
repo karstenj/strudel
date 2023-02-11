@@ -97,8 +97,8 @@ export default defineConfig({
       },
     }),
   ],
-  site: `https://strudel.tidalcycles.org`,
-  base: '/',
+  site: `https://karstenj.github.io`,
+  base: '/strudel',
   vite: {
     ssr: {
       // Example: Force a broken package to skip SSR processing, if needed
