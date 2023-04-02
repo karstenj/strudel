@@ -19,7 +19,7 @@ export const tokenizeNote = (note) => {
 };
 
 // turns the given note into its midi number representation
-export const toMidi = (note) => {
+export const noteToMidi = (note) => {
   const [pc, acc, oct = 3] = tokenizeNote(note);
   if (!pc) {
     throw new Error('not a note: "' + note + '"');
@@ -28,7 +28,7 @@ export const toMidi = (note) => {
   const offset = acc?.split('').reduce((o, char) => o + { '#': 1, b: -1, s: 1 }[char], 0) || 0;
   return (Number(oct) + 1) * 12 + chroma + offset;
 };
-export const fromMidi = (n) => {
+export const midiToFreq = (n) => {
   return Math.pow(2, (n - 69) / 12) * 440;
 };
 
@@ -45,7 +45,7 @@ export const valueToMidi = (value, fallbackValue) => {
     return freqToMidi(freq);
   }
   if (typeof note === 'string') {
-    return toMidi(note);
+    return noteToMidi(note);
   }
   if (typeof note === 'number') {
     return note;
@@ -58,16 +58,18 @@ export const valueToMidi = (value, fallbackValue) => {
 
 /**
  * @deprecated does not appear to be referenced or invoked anywhere in the codebase
+ * @noAutocomplete
  */
 export const getFreq = (noteOrMidi) => {
   if (typeof noteOrMidi === 'number') {
-    return fromMidi(noteOrMidi);
+    return midiToFreq(noteOrMidi);
   }
-  return fromMidi(toMidi(noteOrMidi));
+  return midiToFreq(noteToMidi(noteOrMidi));
 };
 
 /**
  * @deprecated does not appear to be referenced or invoked anywhere in the codebase
+ * @noAutocomplete
  */
 export const midi2note = (n) => {
   const oct = Math.floor(n / 12) - 1;
@@ -89,7 +91,7 @@ export const getPlayableNoteValue = (hap) => {
   }
   // if value is number => interpret as midi number as long as its not marked as frequency
   if (typeof note === 'number' && context.type !== 'frequency') {
-    note = fromMidi(hap.value);
+    note = midiToFreq(hap.value);
   } else if (typeof note === 'number' && context.type === 'frequency') {
     note = hap.value; // legacy workaround.. will be removed in the future
   } else if (typeof note !== 'string' || !isNote(note)) {
@@ -108,9 +110,9 @@ export const getFrequency = (hap) => {
     return getFreq(value.note || value.n || value.value);
   }
   if (typeof value === 'number' && context.type !== 'frequency') {
-    value = fromMidi(hap.value);
+    value = midiToFreq(hap.value);
   } else if (typeof value === 'string' && isNote(value)) {
-    value = fromMidi(toMidi(hap.value));
+    value = midiToFreq(noteToMidi(hap.value));
   } else if (typeof value !== 'number') {
     throw new Error('not a note or frequency: ' + value);
   }
@@ -168,7 +170,7 @@ export function parseNumeral(numOrString) {
     return asNumber;
   }
   if (isNote(numOrString)) {
-    return toMidi(numOrString);
+    return noteToMidi(numOrString);
   }
   throw new Error(`cannot parse as numeral: "${numOrString}"`);
 }
@@ -204,3 +206,9 @@ export function parseFractional(numOrString) {
 }
 
 export const fractionalArgs = (fn) => mapArgs(fn, parseFractional);
+
+export const splitAt = function (index, value) {
+  return [value.slice(0, index), value.slice(index)];
+};
+
+export const zipWith = (f, xs, ys) => xs.map((n, i) => f(n, ys[i]));

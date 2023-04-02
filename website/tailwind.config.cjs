@@ -10,9 +10,16 @@ module.exports = {
   ],
   theme: {
     extend: {
+      keyframes: {
+        train: {
+          '0%': { transform: 'translateX(-100%)' },
+          '100%': { transform: 'translateX(100%)' },
+        },
+      },
+      animation: {
+        train: 'train 2s linear infinite',
+      },
       colors: {
-        tertiary: '#82aaff',
-        highlight: '#bb8800',
         // codemirror-theme settings
         background: 'var(--background)',
         lineBackground: 'var(--lineBackground)',
@@ -24,6 +31,9 @@ module.exports = {
         gutterForeground: 'var(--gutterForeground)',
         gutterBorder: 'var(--gutterBorder)',
         lineHighlight: 'var(--lineHighlight)',
+      },
+      spacing: {
+        'app-height': 'var(--app-height)',
       },
       typography(theme) {
         return {
@@ -41,5 +51,5 @@ module.exports = {
       },
     },
   },
-  plugins: [require('@tailwindcss/typography')],
+  plugins: [require('@tailwindcss/typography'), require('@tailwindcss/forms')],
 };

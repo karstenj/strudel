@@ -5,47 +5,66 @@ This program is free software: you can redistribute it and/or modify it under th
 */
 
 import { Pattern, sequence } from './pattern.mjs';
+import { zipWith } from './util.mjs';
 
 const controls = {};
 const generic_params = [
   /**
-   * Select a sound / sample by name.
-   *
-   * <details style={{display:'none'}}>
-   * <summary>show all sounds</summary>
-   *
-   * 808 (6) 808bd (25) 808cy (25) 808hc (5) 808ht (5) 808lc (5) 808lt (5) 808mc (5) 808mt (5) 808oh (5) 808sd (25) 909 (1) ab (12) ade (10) ades2 (9) ades3 (7) ades4 (6) alex (2) alphabet (26) amencutup (32) armora (7) arp (2) arpy (11) auto (11) baa (7) baa2 (7) bass (4) bass0 (3) bass1 (30) bass2 (5) bass3 (11) bassdm (24) bassfoo (3) battles (2) bd (24) bend (4) bev (2) bin (2) birds (10) birds3 (19) bleep (13) blip (2) blue (2) bottle (13) breaks125 (2) breaks152 (1) breaks157 (1) breaks165 (1) breath (1) bubble (8) can (14) casio (3) cb (1) cc (6) chin (4) circus (3) clak (2) click (4) clubkick (5) co (4) coins (1) control (2) cosmicg (15) cp (2) cr (6) crow (4) d (4) db (13) diphone (38) diphone2 (12) dist (16) dork2 (4) dorkbot (2) dr (42) dr2 (6) dr55 (4) dr_few (8) drum (6) drumtraks (13) e (8) east (9) electro1 (13) em2 (6) erk (1) f (1) feel (7) feelfx (8) fest (1) fire (1) flick (17) fm (17) foo (27) future (17) gab (10) gabba (4) gabbaloud (4) gabbalouder (4) glasstap (3) glitch (8) glitch2 (8) gretsch (24) gtr (3) h (7) hand (17) hardcore (12) hardkick (6) haw (6) hc (6) hh (13) hh27 (13) hit (6) hmm (1) ho (6) hoover (6) house (8) ht (16) if (5) ifdrums (3) incoming (8) industrial (32) insect (3) invaders (18) jazz (8) jungbass (20) jungle (13) juno (12) jvbass (13) kicklinn (1) koy (2) kurt (7) latibro (8) led (1) less (4) lighter (33) linnhats (6) lt (16) made (7) made2 (1) mash (2) mash2 (4) metal (10) miniyeah (4) monsterb (6) moog (7) mouth (15) mp3 (4) msg (9) mt (16) mute (28) newnotes (15) noise (1) noise2 (8) notes (15) numbers (9) oc (4) odx (15) off (1) outdoor (6) pad (3) padlong (1) pebbles (1) perc (6) peri (15) pluck (17) popkick (10) print (11) proc (2) procshort (8) psr (30) rave (8) rave2 (4) ravemono (2) realclaps (4) reverbkick (1) rm (2) rs (1) sax (22) sd (2) seawolf (3) sequential (8) sf (18) sheffield (1) short (5) sid (12) sine (6) sitar (8) sn (52) space (18) speakspell (12) speech (7) speechless (10) speedupdown (9) stab (23) stomp (10) subroc3d (11) sugar (2) sundance (6) tabla (26) tabla2 (46) tablex (3) tacscan (22) tech (13) techno (7) tink (5) tok (4) toys (13) trump (11) ul (10) ulgab (5) uxay (3) v (6) voodoo (5) wind (10) wobble (1) world (3) xmas (1) yeah (31)
-   *
-   * <a href="https://tidalcycles.org/docs/configuration/Audio%20Samples/default_library" target="_blank">more info</a>
-   *
-   * </details>
+   * Select a sound / sample by name. When using mininotation, you can also optionally supply 'n' and 'gain' parameters
+   * separated by ':'.
    *
    * @name s
    * @param {string | Pattern} sound The sound / pattern of sounds to pick
+   * @synonyms sound
    * @example
    * s("bd hh")
+   * @example
+   * s("bd:0 bd:1 bd:0:0.3 bd:1:1.4")
    *
    */
-  ['s', 's', 'sound'],
+  [['s', 'n', 'gain'], 'sound'],
   /**
-   * The note or sample number to choose for a synth or sampleset
-   * Note names currently not working yet, but will hopefully soon. Just stick to numbers for now
+   * Define a custom webaudio node to use as a sound source.
+   *
+   * @name source
+   * @param {function} getSource
+   * @synonyms src
+   *
+   */
+  ['source', 'src'],
+  /**
+   * Selects the given index from the sample map.
+   * Numbers too high will wrap around.
+   * `n` can also be used to play midi numbers, but it is recommended to use `note` instead.
    *
    * @name n
-   * @param {string | number | Pattern} value note name, note number or sample number
+   * @param {number | Pattern} value sample index starting from 0
    * @example
-   * s('superpiano').n("<0 1 2 3>").osc()
-   * @example
-   * s('superpiano').n("<c4 d4 e4 g4>").osc()
-   * @example
-   * n("0 1 2 3").s('east').osc()
+   * s("bd sd,hh*3").n("<0 1>")
    */
   // also see https://github.com/tidalcycles/strudel/pull/63
-  ['f', 'n', 'The note or sample number to choose for a synth or sampleset'],
-  ['f', 'note', 'The note or pitch to play a sound or synth with'],
-  //['s', 'toArg', 'for internal sound routing'],
-  // ["f", "from", "for internal sound routing"),
-  //['f', 'to', 'for internal sound routing'],
+  ['n'],
+  /**
+   * Plays the given note name or midi number. A note name consists of
+   *
+   * - a letter (a-g or A-G)
+   * - optional accidentals (b or #)
+   * - optional octave number (0-9). Defaults to 3
+   *
+   * Examples of valid note names: `c`, `bb`, `Bb`, `f#`, `c3`, `A4`, `Eb2`, `c#5`
+   *
+   * You can also use midi numbers instead of note names, where 69 is mapped to A4 440Hz in 12EDO.
+   *
+   * @name note
+   * @example
+   * note("c a f e")
+   * @example
+   * note("c4 a4 f4 e4")
+   * @example
+   * note("60 69 65 64")
+   */
+  [['note', 'n']],
+
   /**
    * A pattern of numbers that speed up (or slow down) samples while they play. Currently only supported by osc / superdirt.
    *
@@ -56,7 +75,7 @@ const generic_params = [
    * s("sax").accelerate("<0 1 2 4 8 16>").slow(2).osc()
    *
    */
-  ['f', 'accelerate', 'a pattern of numbers that speed up (or slow down) samples while they play.'],
+  ['accelerate'],
   /**
    * Controls the gain by an exponential amount.
    *
@@ -66,11 +85,7 @@ const generic_params = [
    * s("hh*8").gain(".4!2 1 .4!2 1 .4 1")
    *
    */
-  [
-    'f',
-    'gain',
-    'a pattern of numbers that specify volume. Values less than 1 make the sound quieter. Values greater than 1 make the sound louder. For the linear equivalent, see @amp@.',
-  ],
+  ['gain'],
   /**
    * Like {@link gain}, but linear.
    *
@@ -81,17 +96,18 @@ const generic_params = [
    * s("bd*8").amp(".1*2 .5 .1*2 .5 .1 .5").osc()
    *
    */
-  ['f', 'amp', 'like @gain@, but linear.'],
+  ['amp'],
   /**
    * Amplitude envelope attack time: Specifies how long it takes for the sound to reach its peak value, relative to the onset.
    *
    * @name attack
    * @param {number | Pattern} attack time in seconds.
+   * @synonyms att
    * @example
    * note("c3 e3").attack("<0 .1 .5>")
    *
    */
-  ['f', 'attack'],
+  ['attack', 'att'],
 
   /**
    * Select the sound bank to use. To be used together with `s`. The bank name (+ "_") will be prepended to the value of `s`.
@@ -102,7 +118,7 @@ const generic_params = [
    * s("bd sd").bank('RolandTR909') // = s("RolandTR909_bd RolandTR909_sd")
    *
    */
-  ['f', 'bank', 'selects sound bank to use'],
+  ['bank'],
 
   /**
    * Amplitude envelope decay time: the time it takes after the attack time to reach the sustain level.
@@ -114,52 +130,46 @@ const generic_params = [
    * note("c3 e3").decay("<.1 .2 .3 .4>").sustain(0)
    *
    */
-  ['f', 'decay', ''],
+  ['decay'],
   /**
    * Amplitude envelope sustain level: The level which is reached after attack / decay, being sustained until the offset.
    *
    * @name sustain
    * @param {number | Pattern} gain sustain level between 0 and 1
+   * @synonyms sus
    * @example
    * note("c3 e3").decay(.2).sustain("<0 .1 .4 .6 1>")
    *
    */
-  ['f', 'sustain', ''],
+  ['sustain', 'sus'],
   /**
    * Amplitude envelope release time: The time it takes after the offset to go from sustain level to zero.
    *
    * @name release
    * @param {number | Pattern} time release time in seconds
+   * @synonyms rel
    * @example
    * note("c3 e3 g3 c4").release("<0 .1 .4 .6 1>/2")
    *
    */
-  [
-    'f',
-    'release',
-    'a pattern of numbers to specify the release time (in seconds) of an envelope applied to each sample.',
-  ],
-  [
-    'f',
-    'hold',
-    'a pattern of numbers to specify the hold time (in seconds) of an envelope applied to each sample. Only takes effect if `attack` and `release` are also specified.',
-  ],
+  ['release', 'rel'],
+  ['hold'],
   // TODO: in tidal, it seems to be normalized
   /**
-   * Sets the center frequency of the **b**and-**p**ass **f**ilter.
+   * Sets the center frequency of the **b**and-**p**ass **f**ilter. When using mininotation, you
+   * can also optionally supply the 'bpq' parameter separated by ':'.
    *
    * @name bpf
    * @param {number | Pattern} frequency center frequency
-   * @synonyms bandf
+   * @synonyms bandf, bp
    * @example
    * s("bd sd,hh*3").bpf("<1000 2000 4000 8000>")
    *
    */
-  ['f', 'bpf', ''],
-  ['f', 'bandf', 'A pattern of numbers from 0 to 1. Sets the center frequency of the band-pass filter.'],
+  [['bandf', 'bandq'], 'bpf', 'bp'],
   // TODO: in tidal, it seems to be normalized
   /**
-   * Sets the **b**and-**p**ass **q**-factor (resonance)
+   * Sets the **b**and-**p**ass **q**-factor (resonance).
    *
    * @name bpq
    * @param {number | Pattern} q q factor
@@ -168,8 +178,9 @@ const generic_params = [
    * s("bd sd").bpf(500).bpq("<0 1 2 3>")
    *
    */
-  ['f', 'bpq', ''],
-  ['f', 'bandq', 'a pattern of anumbers from 0 to 1. Sets the q-factor of the band-pass filter.'],
+  // currently an alias of 'bandq' https://github.com/tidalcycles/strudel/issues/496
+  // ['bpq'],
+  ['bandq', 'bpq'],
   /**
    * a pattern of numbers from 0 to 1. Skips the beginning of each sample, e.g. `0.25` to cut off the first quarter from each sample.
    *
@@ -181,11 +192,7 @@ const generic_params = [
    * s("rave").begin("<0 .25 .5 .75>")
    *
    */
-  [
-    'f',
-    'begin',
-    'a pattern of numbers from 0 to 1. Skips the beginning of each sample, e.g. `0.25` to cut off the first quarter from each sample.',
-  ],
+  ['begin'],
   /**
    * The same as .begin, but cuts off the end off each sample.
    *
@@ -196,11 +203,7 @@ const generic_params = [
    * s("bd*2,oh*4").end("<.1 .2 .5 1>")
    *
    */
-  [
-    'f',
-    'end',
-    'the same as `begin`, but cuts the end off samples, shortening them; e.g. `0.75` to cut off the last quarter of each sample.',
-  ],
+  ['end'],
   /**
    * Loops the sample (from `begin` to `end`) the specified number of times.
    * Note that the tempo of the loop is not synced with the cycle tempo.
@@ -211,7 +214,7 @@ const generic_params = [
    * s("bd").loop("<1 2 3 4>").osc()
    *
    */
-  ['f', 'loop', 'loops the sample (from `begin` to `end`) the specified number of times.'],
+  ['loop'],
   // TODO: currently duplicated with "native" legato
   // TODO: superdirt legato will do more: https://youtu.be/dQPmE1WaD1k?t=419
   /**
@@ -223,8 +226,8 @@ const generic_params = [
    * "c4 eb4 g4 bb4".legato("<0.125 .25 .5 .75 1 2 4>")
    *
    */
-  // ['f', 'legato', 'controls the amount of overlap between two adjacent sounds'],
-  // ['f', 'clhatdecay', ''],
+  // ['legato'],
+  // ['clhatdecay'],
   /**
    * bit crusher effect.
    *
@@ -234,11 +237,7 @@ const generic_params = [
    * s("<bd sd>,hh*3").fast(2).crush("<16 8 7 6 5 4 3 2>")
    *
    */
-  [
-    'f',
-    'crush',
-    'bit crushing, a pattern of numbers from 1 (for drastic reduction in bit-depth) to 16 (for barely no reduction).',
-  ],
+  ['crush'],
   /**
    * fake-resampling for lowering the sample rate. Caution: This effect seems to only work in chromium based browsers
    *
@@ -248,11 +247,7 @@ const generic_params = [
    * s("bd sd,hh*4").coarse("<1 4 8 16 32>")
    *
    */
-  [
-    'f',
-    'coarse',
-    'fake-resampling, a pattern of numbers for lowering the sample rate, i.e. 1 for original 2 for half, 3 for a third and so on.',
-  ],
+  ['coarse'],
 
   /**
    * choose the channel the pattern is sent to in superdirt
@@ -261,7 +256,7 @@ const generic_params = [
    * @param {number | Pattern} channel channel number
    *
    */
-  ['i', 'channel', 'choose the channel the pattern is sent to in superdirt'],
+  ['channel'],
   /**
    * In the style of classic drum-machines, `cut` will stop a playing sample as soon as another samples with in same cutgroup is to be played. An example would be an open hi-hat followed by a closed one, essentially muting the open.
    *
@@ -271,35 +266,39 @@ const generic_params = [
    * s("rd*4").cut(1)
    *
    */
-  [
-    'i',
-    'cut',
-    'In the style of classic drum-machines, `cut` will stop a playing sample as soon as another samples with in same cutgroup is to be played. An example would be an open hi-hat followed by a closed one, essentially muting the open.',
-  ],
+  ['cut'],
   /**
    * Applies the cutoff frequency of the **l**ow-**p**ass **f**ilter.
    *
+   * When using mininotation, you can also optionally add the 'lpq' parameter, separated by ':'.
+   *
    * @name lpf
    * @param {number | Pattern} frequency audible between 0 and 20000
-   * @synonyms cutoff
+   * @synonyms cutoff, ctf, lp
    * @example
    * s("bd sd,hh*3").lpf("<4000 2000 1000 500 200 100>")
+   * @example
+   * s("bd*8").lpf("1000:0 1000:10 1000:20 1000:30")
    *
    */
-  ['f', 'lpf'],
-  ['f', 'cutoff', 'a pattern of numbers from 0 to 1. Applies the cutoff frequency of the low-pass filter.'],
+  [['cutoff', 'resonance'], 'ctf', 'lpf', 'lp'],
   /**
    * Applies the cutoff frequency of the **h**igh-**p**ass **f**ilter.
    *
+   * When using mininotation, you can also optionally add the 'hpq' parameter, separated by ':'.
+   *
    * @name hpf
    * @param {number | Pattern} frequency audible between 0 and 20000
-   * @synonyms hcutoff
+   * @synonyms hp, hcutoff
    * @example
    * s("bd sd,hh*4").hpf("<4000 2000 1000 500 200 100>")
+   * @example
+   * s("bd sd,hh*4").hpf("<2000 2000:25>")
    *
    */
-  ['f', 'hpf', ''],
-  ['f', 'hcutoff', ''],
+  // currently an alias of 'hcutoff' https://github.com/tidalcycles/strudel/issues/496
+  // ['hpf'],
+  [['hcutoff', 'hresonance'], 'hpf', 'hp'],
   /**
    * Controls the **h**igh-**p**ass **q**-value.
    *
@@ -310,8 +309,7 @@ const generic_params = [
    * s("bd sd,hh*4").hpf(2000).hpq("<0 10 20 30>")
    *
    */
-  ['f', 'hresonance', ''],
-  ['f', 'hpq', ''],
+  ['hresonance', 'hpq'],
   /**
    * Controls the **l**ow-**p**ass **q**-value.
    *
@@ -322,8 +320,8 @@ const generic_params = [
    * s("bd sd,hh*4").lpf(2000).lpq("<0 10 20 30>")
    *
    */
-  ['f', 'lpq'],
-  ['f', 'resonance', ''],
+  // currently an alias of 'resonance' https://github.com/tidalcycles/strudel/issues/496
+  ['resonance', 'lpq'],
   /**
    * DJ filter, below 0.5 is low pass filter, above is high pass filter.
    *
@@ -333,40 +331,48 @@ const generic_params = [
    * n("0 3 7 [10,24]").s('superzow').octave(3).djf("<.5 .25 .5 .75>").osc()
    *
    */
-  ['f', 'djf', 'DJ filter, below 0.5 is low pass filter, above is high pass filter.'],
-  // ['f', 'cutoffegint', ''],
+  ['djf'],
+  // ['cutoffegint'],
   // TODO: does not seem to work
   /**
    * Sets the level of the delay signal.
+   *
+   * When using mininotation, you can also optionally add the 'delaytime' and 'delayfeedback' parameter,
+   * separated by ':'.
+   *
    *
    * @name delay
    * @param {number | Pattern} level between 0 and 1
    * @example
    * s("bd").delay("<0 .25 .5 1>")
+   * @example
+   * s("bd bd").delay("0.65:0.25:0.9 0.65:0.125:0.7")
    *
    */
-  ['f', 'delay', 'a pattern of numbers from 0 to 1. Sets the level of the delay signal.'],
+  [['delay', 'delaytime', 'delayfeedback']],
   /**
    * Sets the level of the signal that is fed back into the delay.
    * Caution: Values >= 1 will result in a signal that gets louder and louder! Don't do it
    *
    * @name delayfeedback
    * @param {number | Pattern} feedback between 0 and 1
+   * @synonyms delayfb, dfb
    * @example
    * s("bd").delay(.25).delayfeedback("<.25 .5 .75 1>").slow(2)
    *
    */
-  ['f', 'delayfeedback', 'a pattern of numbers from 0 to 1. Sets the amount of delay feedback.'],
+  ['delayfeedback', 'delayfb', 'dfb'],
   /**
    * Sets the time of the delay effect.
    *
    * @name delaytime
    * @param {number | Pattern} seconds between 0 and Infinity
+   * @synonyms delayt, dt
    * @example
    * s("bd").delay(.25).delaytime("<.125 .25 .5 1>").slow(2)
    *
    */
-  ['f', 'delaytime', 'a pattern of numbers from 0 to 1. Sets the length of the delay.'],
+  ['delaytime', 'delayt', 'dt'],
   /* // TODO: test
    * Specifies whether delaytime is calculated relative to cps.
    *
@@ -376,21 +382,19 @@ const generic_params = [
    * s("sd").delay().lock(1).osc()
    *
    */
-  [
-    'f',
-    'lock',
-    'A pattern of numbers. Specifies whether delaytime is calculated relative to cps. When set to 1, delaytime is a direct multiple of a cycle.',
-  ],
+  ['lock'],
   /**
    * Set detune of oscillators. Works only with some synths, see <a target="_blank" href="https://tidalcycles.org/docs/patternlib/tutorials/synthesizers">tidal doc</a>
    *
    * @name detune
    * @param {number | Pattern} amount between 0 and 1
+   * @synonyms det
+   * @superdirtOnly
    * @example
    * n("0 3 7").s('superzow').octave(3).detune("<0 .25 .5 1 2>").osc()
    *
    */
-  ['f', 'detune', ''],
+  ['detune', 'det'],
   /**
    * Set dryness of reverb. See {@link room} and {@link size} for more information about reverb.
    *
@@ -398,13 +402,10 @@ const generic_params = [
    * @param {number | Pattern} dry 0 = wet, 1 = dry
    * @example
    * n("[0,3,7](3,8)").s("superpiano").room(.7).dry("<0 .5 .75 1>").osc()
+   * @superdirtOnly
    *
    */
-  [
-    'f',
-    'dry',
-    'when set to `1` will disable all reverb for this pattern. See `room` and `size` for more information about reverb.',
-  ],
+  ['dry'],
   // TODO: does not seem to do anything
   /*
    * Used when using {@link begin}/{@link end} or {@link chop}/{@link striate} and friends, to change the fade out time of the 'grain' envelope.
@@ -415,17 +416,9 @@ const generic_params = [
    * s("oh*4").end(.1).fadeTime("<0 .2 .4 .8>").osc()
    *
    */
-  [
-    'f',
-    'fadeTime',
-    "Used when using begin/end or chop/striate and friends, to change the fade out time of the 'grain' envelope.",
-  ],
+  ['fadeTime', 'fadeOutTime'],
   // TODO: see above
-  [
-    'f',
-    'fadeInTime',
-    'As with fadeTime, but controls the fade in time of the grain envelope. Not used if the grain begins at position 0 in the sample.',
-  ],
+  ['fadeInTime'],
   /**
    * Set frequency of sound.
    *
@@ -437,15 +430,15 @@ const generic_params = [
    * freq("110".mul.out(".5 1.5 .6 [2 3]")).s("superzow").osc()
    *
    */
-  ['f', 'freq', ''],
+  ['freq'],
   // TODO: https://tidalcycles.org/docs/configuration/MIDIOSC/control-voltage/#gate
-  ['f', 'gate', ''],
-  // ['f', 'hatgrain', ''],
-  // ['f', 'lagogo', ''],
-  // ['f', 'lclap', ''],
-  // ['f', 'lclaves', ''],
-  // ['f', 'lclhat', ''],
-  // ['f', 'lcrash', ''],
+  ['gate', 'gat'],
+  // ['hatgrain'],
+  // ['lagogo'],
+  // ['lclap'],
+  // ['lclaves'],
+  // ['lclhat'],
+  // ['lcrash'],
   // TODO:
   // https://tidalcycles.org/docs/reference/audio_effects/#leslie-1
   // https://tidalcycles.org/docs/reference/audio_effects/#leslie
@@ -456,9 +449,10 @@ const generic_params = [
    * @param {number | Pattern} wet between 0 and 1
    * @example
    * n("0,4,7").s("supersquare").leslie("<0 .4 .6 1>").osc()
+   * @superdirtOnly
    *
    */
-  ['f', 'leslie', ''],
+  ['leslie'],
   /**
    * Rate of modulation / rotation for leslie effect
    *
@@ -466,10 +460,11 @@ const generic_params = [
    * @param {number | Pattern} rate 6.7 for fast, 0.7 for slow
    * @example
    * n("0,4,7").s("supersquare").leslie(1).lrate("<1 2 4 8>").osc()
+   * @superdirtOnly
    *
    */
   // TODO: the rate seems to "lag" (in the example, 1 will be fast)
-  ['f', 'lrate', ''],
+  ['lrate'],
   /**
    * Physical size of the cabinet in meters. Be careful, it might be slightly larger than your computer. Affects the Doppler amount (pitch warble)
    *
@@ -477,33 +472,31 @@ const generic_params = [
    * @param {number | Pattern} meters somewhere between 0 and 1
    * @example
    * n("0,4,7").s("supersquare").leslie(1).lrate(2).lsize("<.1 .5 1>").osc()
+   * @superdirtOnly
    *
    */
-  ['f', 'lsize', ''],
-  // ['f', 'lfo', ''],
-  // ['f', 'lfocutoffint', ''],
-  // ['f', 'lfodelay', ''],
-  // ['f', 'lfoint', ''],
-  // ['f', 'lfopitchint', ''],
-  // ['f', 'lfoshape', ''],
-  // ['f', 'lfosync', ''],
-  // ['f', 'lhitom', ''],
-  // ['f', 'lkick', ''],
-  // ['f', 'llotom', ''],
-  // ['f', 'lophat', ''],
-  // ['f', 'lsnare', ''],
-  ['f', 'degree', ''], // TODO: what is this? not found in tidal doc
-  ['f', 'mtranspose', ''], // TODO: what is this? not found in tidal doc
-  ['f', 'ctranspose', ''], // TODO: what is this? not found in tidal doc
-  ['f', 'harmonic', ''], // TODO: what is this? not found in tidal doc
-  ['f', 'stepsPerOctave', ''], // TODO: what is this? not found in tidal doc
-  ['f', 'octaveR', ''], // TODO: what is this? not found in tidal doc
-  // TODO: why is this needed? what's the difference to late / early?
-  [
-    'f',
-    'nudge',
-    'Nudges events into the future by the specified number of seconds. Negative numbers work up to a point as well (due to internal latency)',
-  ],
+  ['lsize'],
+  // ['lfo'],
+  // ['lfocutoffint'],
+  // ['lfodelay'],
+  // ['lfoint'],
+  // ['lfopitchint'],
+  // ['lfoshape'],
+  // ['lfosync'],
+  // ['lhitom'],
+  // ['lkick'],
+  // ['llotom'],
+  // ['lophat'],
+  // ['lsnare'],
+  ['degree'], // TODO: what is this? not found in tidal doc
+  ['mtranspose'], // TODO: what is this? not found in tidal doc
+  ['ctranspose'], // TODO: what is this? not found in tidal doc
+  ['harmonic'], // TODO: what is this? not found in tidal doc
+  ['stepsPerOctave'], // TODO: what is this? not found in tidal doc
+  ['octaveR'], // TODO: what is this? not found in tidal doc
+  // TODO: why is this needed? what's the difference to late / early? Answer: it's in seconds, and delays the message at
+  // OSC time (so can't be negative, at least not beyond the latency value)
+  ['nudge'],
   // TODO: the following doc is just a guess, it's not documented in tidal doc.
   /**
    * Sets the default octave of a synth.
@@ -512,10 +505,11 @@ const generic_params = [
    * @param {number | Pattern} octave octave number
    * @example
    * n("0,4,7").s('supersquare').octave("<3 4 5 6>").osc()
+   * @superDirtOnly
    */
-  ['i', 'octave', ''],
-  ['f', 'offset', ''], // TODO: what is this? not found in tidal doc
-  // ['f', 'ophatdecay', ''],
+  ['octave'],
+  ['offset'], // TODO: what is this? not found in tidal doc
+  // ['ophatdecay'],
   // TODO: example
   /**
    * An `orbit` is a global parameter context for patterns. Patterns with the same orbit will share the same global effects.
@@ -528,13 +522,9 @@ const generic_params = [
    *   s("~ sd").delay(.5).delaytime(.125).orbit(2)
    * )
    */
-  [
-    'i',
-    'orbit',
-    'a pattern of numbers. An `orbit` is a global parameter context for patterns. Patterns with the same orbit will share hardware output bus offset and global effects, e.g. reverb and delay. The maximum number of orbits is specified in the superdirt startup, numbers higher than maximum will wrap around.',
-  ],
-  ['f', 'overgain', ''], // TODO: what is this? not found in tidal doc
-  ['f', 'overshape', ''], // TODO: what is this? not found in tidal doc
+  ['orbit'],
+  ['overgain'], // TODO: what is this? not found in tidal doc Answer: gain is limited to maximum of 2. This allows you to go over that
+  ['overshape'], // TODO: what is this? not found in tidal doc. Similar to above, but limited to 1
   /**
    * Sets position in stereo.
    *
@@ -544,11 +534,7 @@ const generic_params = [
    * s("[bd hh]*2").pan("<.5 1 .5 0>")
    *
    */
-  [
-    'f',
-    'pan',
-    'a pattern of numbers between 0 and 1, from left to right (assuming stereo), once round a circle (assuming multichannel)',
-  ],
+  ['pan'],
   // TODO: this has no effect (see example)
   /*
    * Controls how much multichannel output is fanned out
@@ -559,11 +545,7 @@ const generic_params = [
    * s("[bd hh]*2").pan("<.5 1 .5 0>").panspan("<0 .5 1>").osc()
    *
    */
-  [
-    'f',
-    'panspan',
-    'a pattern of numbers between -inf and inf, which controls how much multichannel output is fanned out (negative is backwards ordering)',
-  ],
+  ['panspan'],
   // TODO: this has no effect (see example)
   /*
    * Controls how much multichannel output is spread
@@ -574,50 +556,42 @@ const generic_params = [
    * s("[bd hh]*2").pan("<.5 1 .5 0>").pansplay("<0 .5 1>").osc()
    *
    */
-  [
-    'f',
-    'pansplay',
-    'a pattern of numbers between 0.0 and 1.0, which controls the multichannel spread range (multichannel only)',
-  ],
-  [
-    'f',
-    'panwidth',
-    'a pattern of numbers between 0.0 and inf, which controls how much each channel is distributed over neighbours (multichannel only)',
-  ],
-  [
-    'f',
-    'panorient',
-    'a pattern of numbers between -1.0 and 1.0, which controls the relative position of the centre pan in a pair of adjacent speakers (multichannel only)',
-  ],
-  // ['f', 'pitch1', ''],
-  // ['f', 'pitch2', ''],
-  // ['f', 'pitch3', ''],
-  // ['f', 'portamento', ''],
+  ['pansplay'],
+  ['panwidth'],
+  ['panorient'],
+  // ['pitch1'],
+  // ['pitch2'],
+  // ['pitch3'],
+  // ['portamento'],
   // TODO: LFO rate see https://tidalcycles.org/docs/patternlib/tutorials/synthesizers/#supersquare
-  ['f', 'rate', "used in SuperDirt softsynths as a control rate or 'speed'"],
+  ['rate'],
   // TODO: slide param for certain synths
-  ['f', 'slide', ''],
+  ['slide'],
   // TODO: detune? https://tidalcycles.org/docs/patternlib/tutorials/synthesizers/#supersquare
-  ['f', 'semitone', ''],
+  ['semitone'],
   // TODO: dedup with synth param, see https://tidalcycles.org/docs/reference/synthesizers/#superpiano
-  // ['f', 'velocity', ''],
-  ['f', 'voice', ''], // TODO: synth param
+  // ['velocity'],
+  ['voice'], // TODO: synth param
   /**
    * Sets the level of reverb.
+   *
+   * When using mininotation, you can also optionally add the 'size' parameter, separated by ':'.
    *
    * @name room
    * @param {number | Pattern} level between 0 and 1
    * @example
    * s("bd sd").room("<0 .2 .4 .6 .8 1>")
+   * @example
+   * s("bd sd").room("<0.9:1 0.9:4>")
    *
    */
-  ['f', 'room', 'a pattern of numbers from 0 to 1. Sets the level of reverb.'],
+  [['room', 'size']],
   /**
    * Sets the room size of the reverb, see {@link room}.
    *
    * @name roomsize
-   * @synonyms size
    * @param {number | Pattern} size between 0 and 10
+   * @synonyms size, sz
    * @example
    * s("bd sd").room(.8).roomsize("<0 1 2 4 8>")
    *
@@ -625,20 +599,11 @@ const generic_params = [
   // TODO: find out why :
   // s("bd sd").room(.8).roomsize("<0 .2 .4 .6 .8 [1,0]>").osc()
   // .. does not work. Is it because room is only one effect?
-  [
-    'f',
-    'size',
-    'a pattern of numbers from 0 to 1. Sets the perceptual size (reverb time) of the `room` to be used in reverb.',
-  ],
-  [
-    'f',
-    'roomsize',
-    'a pattern of numbers from 0 to 1. Sets the perceptual size (reverb time) of the `room` to be used in reverb.',
-  ],
-  // ['f', 'sagogo', ''],
-  // ['f', 'sclap', ''],
-  // ['f', 'sclaves', ''],
-  // ['f', 'scrash', ''],
+  ['size', 'sz', 'roomsize'],
+  // ['sagogo'],
+  // ['sclap'],
+  // ['sclaves'],
+  // ['scrash'],
   /**
    * Wave shaping distortion. CAUTION: it might get loud
    *
@@ -648,11 +613,7 @@ const generic_params = [
    * s("bd sd,hh*4").shape("<0 .2 .4 .6 .8>")
    *
    */
-  [
-    'f',
-    'shape',
-    'wave shaping distortion, a pattern of numbers from 0 for no distortion up to 1 for loads of distortion.',
-  ],
+  ['shape'],
   /**
    * Changes the speed of sample playback, i.e. a cheap way of changing pitch.
    *
@@ -664,11 +625,7 @@ const generic_params = [
    * speed("1 1.5*2 [2 1.1]").s("piano").clip(1)
    *
    */
-  [
-    'f',
-    'speed',
-    'a pattern of numbers which changes the speed of sample playback, i.e. a cheap way of changing pitch. Negative values will play the sample backwards!',
-  ],
+  ['speed'],
   /**
    * Used in conjunction with {@link speed}, accepts values of "r" (rate, default behavior), "c" (cycles), or "s" (seconds). Using `unit "c"` means `speed` will be interpreted in units of cycles, e.g. `speed "1"` means samples will be stretched to fill a cycle. Using `unit "s"` means the playback speed will be adjusted so that the duration is the number of seconds specified by `speed`.
    *
@@ -676,13 +633,10 @@ const generic_params = [
    * @param {number | string | Pattern} unit see description above
    * @example
    * speed("1 2 .5 3").s("bd").unit("c").osc()
+   * @superdirtOnly
    *
    */
-  [
-    's',
-    'unit',
-    'used in conjunction with `speed`, accepts values of "r" (rate, default behavior), "c" (cycles), or "s" (seconds). Using `unit "c"` means `speed` will be interpreted in units of cycles, e.g. `speed "1"` means samples will be stretched to fill a cycle. Using `unit "s"` means the playback speed will be adjusted so that the duration is the number of seconds specified by `speed`.',
-  ],
+  ['unit'],
   /**
    * Made by Calum Gunn. Reminiscent of some weird mixture of filter, ring-modulator and pitch-shifter. The SuperCollider manual defines Squiz as:
    *
@@ -692,16 +646,17 @@ const generic_params = [
    * @param {number | Pattern} squiz Try passing multiples of 2 to it - 2, 4, 8 etc.
    * @example
    * squiz("2 4/2 6 [8 16]").s("bd").osc()
+   * @superdirtOnly
    *
    */
-  ['f', 'squiz', ''],
-  ['f', 'stutterdepth', ''], // TODO: what is this? not found in tidal doc
-  ['f', 'stuttertime', ''], // TODO: what is this? not found in tidal doc
-  ['f', 'timescale', ''], // TODO: what is this? not found in tidal doc
-  ['f', 'timescalewin', ''], // TODO: what is this? not found in tidal doc
-  // ['f', 'tomdecay', ''],
-  // ['f', 'vcfegint', ''],
-  // ['f', 'vcoegint', ''],
+  ['squiz'],
+  // ['stutterdepth'], // TODO: what is this? not found in tidal doc
+  // ['stuttertime'], // TODO: what is this? not found in tidal doc
+  // ['timescale'], // TODO: what is this? not found in tidal doc
+  // ['timescalewin'], // TODO: what is this? not found in tidal doc
+  // ['tomdecay'],
+  // ['vcfegint'],
+  // ['vcoegint'],
   // TODO: Use a rest (~) to override the effect <- vowel
   /**
    *
@@ -714,11 +669,7 @@ const generic_params = [
    * .vowel("<a e i <o u>>")
    *
    */
-  [
-    's',
-    'vowel',
-    'formant filter to make things sound like vowels, a pattern of either `a`, `e`, `i`, `o` or `u`. Use a rest (`~`) for no effect.',
-  ],
+  ['vowel'],
   /* // TODO: find out how it works
    * Made by Calum Gunn. Divides an audio stream into tiny segments, using the signal's zero-crossings as segment boundaries, and discards a fraction of them. Takes a number between 1 and 100, denoted the percentage of segments to drop. The SuperCollider manual describes the Waveloss effect this way:
    *
@@ -729,12 +680,12 @@ const generic_params = [
    *
    * @name waveloss
    */
-  ['f', 'waveloss', ''],
+  ['waveloss'],
   // TODO: midi effects?
-  ['f', 'dur', ''],
-  // ['f', 'modwheel', ''],
-  ['f', 'expression', ''],
-  ['f', 'sustainpedal', ''],
+  ['dur'],
+  // ['modwheel'],
+  ['expression'],
+  ['sustainpedal'],
   /* // TODO: doesn't seem to do anything
    *
    * Tremolo Audio DSP effect
@@ -745,59 +696,58 @@ const generic_params = [
    * n("0,4,7").tremolodepth("<0 .3 .6 .9>").osc()
    *
    */
-  // TODO: tremdp alias
-  ['f', 'tremolodepth', "Tremolo Audio DSP effect | params are 'tremolorate' and 'tremolodepth'"],
-  ['f', 'tremolorate', "Tremolo Audio DSP effect | params are 'tremolorate' and 'tremolodepth'"],
+  ['tremolodepth', 'tremdp'],
+  ['tremolorate', 'tremr'],
   // TODO: doesn't seem to do anything
-  ['f', 'phaserdepth', "Phaser Audio DSP effect | params are 'phaserrate' and 'phaserdepth'"],
-  ['f', 'phaserrate', "Phaser Audio DSP effect | params are 'phaserrate' and 'phaserdepth'"],
+  ['phaserdepth', 'phasdp'],
+  ['phaserrate', 'phasr'],
 
-  ['f', 'fshift', 'frequency shifter'],
-  ['f', 'fshiftnote', 'frequency shifter'],
-  ['f', 'fshiftphase', 'frequency shifter'],
+  ['fshift'],
+  ['fshiftnote'],
+  ['fshiftphase'],
 
-  ['f', 'triode', 'tube distortion'],
-  ['f', 'krush', 'shape/bass enhancer'],
-  ['f', 'kcutoff', ''],
-  ['f', 'octer', 'octaver effect'],
-  ['f', 'octersub', 'octaver effect'],
-  ['f', 'octersubsub', 'octaver effect'],
-  ['f', 'ring', 'ring modulation'],
-  ['f', 'ringf', 'ring modulation'],
-  ['f', 'ringdf', 'ring modulation'],
-  ['f', 'distort', 'noisy fuzzy distortion'],
-  ['f', 'freeze', 'Spectral freeze'],
-  ['f', 'xsdelay', ''],
-  ['f', 'tsdelay', ''],
-  ['f', 'real', 'Spectral conform'],
-  ['f', 'imag', ''],
-  ['f', 'enhance', 'Spectral enhance'],
-  ['f', 'partials', ''],
-  ['f', 'comb', 'Spectral comb'],
-  ['f', 'smear', 'Spectral smear'],
-  ['f', 'scram', 'Spectral scramble'],
-  ['f', 'binshift', 'Spectral binshift'],
-  ['f', 'hbrick', 'High pass sort of spectral filter'],
-  ['f', 'lbrick', 'Low pass sort of spectral filter'],
-  ['f', 'midichan', ''],
-  ['f', 'control', ''],
-  ['f', 'ccn', ''],
-  ['f', 'ccv', ''],
-  ['f', 'polyTouch', ''],
-  ['f', 'midibend', ''],
-  ['f', 'miditouch', ''],
-  ['f', 'ctlNum', ''],
-  ['f', 'frameRate', ''],
-  ['f', 'frames', ''],
-  ['f', 'hours', ''],
-  ['s', 'midicmd', ''],
-  ['f', 'minutes', ''],
-  ['f', 'progNum', ''],
-  ['f', 'seconds', ''],
-  ['f', 'songPtr', ''],
-  ['f', 'uid', ''],
-  ['f', 'val', ''],
-  ['f', 'cps', ''],
+  ['triode'],
+  ['krush'],
+  ['kcutoff'],
+  ['octer'],
+  ['octersub'],
+  ['octersubsub'],
+  ['ring'],
+  ['ringf'],
+  ['ringdf'],
+  ['distort'],
+  ['freeze'],
+  ['xsdelay'],
+  ['tsdelay'],
+  ['real'],
+  ['imag'],
+  ['enhance'],
+  ['partials'],
+  ['comb'],
+  ['smear'],
+  ['scram'],
+  ['binshift'],
+  ['hbrick'],
+  ['lbrick'],
+  ['midichan'],
+  ['control'],
+  ['ccn'],
+  ['ccv'],
+  ['polyTouch'],
+  ['midibend'],
+  ['miditouch'],
+  ['ctlNum'],
+  ['frameRate'],
+  ['frames'],
+  ['hours'],
+  ['midicmd'],
+  ['minutes'],
+  ['progNum'],
+  ['seconds'],
+  ['songPtr'],
+  ['uid'],
+  ['val'],
+  ['cps'],
   /**
    * If set to 1, samples will be cut to the duration of their event.
    * In tidal, this would be done with legato, which [is about to land in strudel too](https://github.com/tidalcycles/strudel/issues/111)
@@ -808,32 +758,54 @@ const generic_params = [
    * note("c a f e ~").s("piano").clip(1)
    *
    */
-  ['f', 'clip', ''],
+  ['clip'],
 ];
 
 // TODO: slice / splice https://www.youtube.com/watch?v=hKhPdO0RKDQ&list=PL2lW1zNIIwj3bDkh-Y3LUGDuRcoUigoDs&index=13
 
-const _name = (name, ...pats) => sequence(...pats).withValue((x) => ({ [name]: x }));
+controls.createParam = function (names) {
+  const name = Array.isArray(names) ? names[0] : names;
 
-const _setter = (func, name) =>
-  function (...pats) {
+  var withVal;
+  if (Array.isArray(names)) {
+    withVal = (xs) => {
+      if (Array.isArray(xs)) {
+        const result = {};
+        xs.forEach((x, i) => {
+          if (i < names.length) {
+            result[names[i]] = x;
+          }
+        });
+        return result;
+      } else {
+        return { [name]: xs };
+      }
+    };
+  } else {
+    withVal = (x) => ({ [name]: x });
+  }
+
+  const func = (...pats) => sequence(...pats).withValue(withVal);
+
+  const setter = function (...pats) {
     if (!pats.length) {
-      return this.fmap((value) => ({ [name]: value }));
+      return this.fmap(withVal);
     }
     return this.set(func(...pats));
   };
-
-generic_params.forEach(([type, name, description]) => {
-  controls[name] = (...pats) => _name(name, ...pats);
-  Pattern.prototype[name] = _setter(controls[name], name);
-});
-
-// create custom param
-controls.createParam = (name) => {
-  const func = (...pats) => _name(name, ...pats);
-  Pattern.prototype[name] = _setter(func, name);
-  return (...pats) => _name(name, ...pats);
+  Pattern.prototype[name] = setter;
+  return func;
 };
+
+generic_params.forEach(([names, ...aliases]) => {
+  const name = Array.isArray(names) ? names[0] : names;
+  controls[name] = controls.createParam(names);
+
+  aliases.forEach((alias) => {
+    controls[alias] = controls[name];
+    Pattern.prototype[alias] = Pattern.prototype[name];
+  });
+});
 
 controls.createParams = (...names) =>
   names.reduce((acc, name) => Object.assign(acc, { [name]: controls.createParam(name) }), {});

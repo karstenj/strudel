@@ -6,13 +6,7 @@ This program is free software: you can redistribute it and/or modify it under th
 
 import { cleanupDraw, cleanupUi, controls, evalScope, getDrawContext, logger } from '@strudel.cycles/core';
 import { CodeMirror, cx, flash, useHighlighting, useStrudel, useKeydown } from '@strudel.cycles/react';
-import {
-  getAudioContext,
-  getLoadedSamples,
-  initAudioOnFirstClick,
-  resetLoadedSamples,
-  webaudioOutput,
-} from '@strudel.cycles/webaudio';
+import { getAudioContext, initAudioOnFirstClick, resetLoadedSounds, webaudioOutput } from '@strudel.cycles/webaudio';
 import { createClient } from '@supabase/supabase-js';
 import { nanoid } from 'nanoid';
 import React, { createContext, useCallback, useEffect, useState } from 'react';
@@ -23,9 +17,10 @@ import { prebake } from './prebake.mjs';
 import * as tunes from './tunes.mjs';
 import PlayCircleIcon from '@heroicons/react/20/solid/PlayCircleIcon';
 import { themes } from './themes.mjs';
-import useTheme from '../useTheme';
+import { settingsMap, useSettings, setLatestCode } from '../settings.mjs';
+import Loader from './Loader';
 
-const initialTheme = localStorage.getItem('strudel-theme') || 'strudelTheme';
+const { latestCode } = settingsMap.get();
 
 initAudioOnFirstClick();
 
@@ -48,12 +43,11 @@ const modules = [
   import('@strudel.cycles/csound'),
 ];
 
-evalScope(
+const modulesLoading = evalScope(
   controls, // sadly, this cannot be exported from core direclty
   ...modules,
 );
 
-export let loadedSamples = [];
 const presets = prebake();
 
 let drawContext, clearCanvas;
@@ -61,11 +55,6 @@ if (typeof window !== 'undefined') {
   drawContext = getDrawContext();
   clearCanvas = () => drawContext.clearRect(0, 0, drawContext.canvas.height, drawContext.canvas.width);
 }
-
-Promise.all([...modules, presets]).then((data) => {
-  // console.log('modules and sample registry loade', data);
-  loadedSamples = Object.entries(getLoadedSamples() || {});
-});
 
 const getTime = () => getAudioContext().currentTime;
 
@@ -113,24 +102,28 @@ export const ReplContext = createContext(null);
 export function Repl({ embedded = false }) {
   const isEmbedded = embedded || window.location !== window.parent.location;
   const [view, setView] = useState(); // codemirror view
-  const [theme, setTheme] = useState(initialTheme);
   const [lastShared, setLastShared] = useState();
-  const [activeFooter, setActiveFooter] = useState('');
-  const [isZen, setIsZen] = useState(false);
-  const [pending, setPending] = useState(false);
+  const [pending, setPending] = useState(true);
+
+  const { theme, keybindings, fontSize, fontFamily } = useSettings();
 
   const { code, setCode, scheduler, evaluate, activateCode, isDirty, activeCode, pattern, started, stop, error } =
     useStrudel({
-      initialCode: '// LOADING',
+      initialCode: '// LOADING...',
       defaultOutput: webaudioOutput,
       getTime,
-      autolink: true,
-      beforeEval: () => {
+      beforeEval: async () => {
+        setPending(true);
+        await modulesLoading;
         cleanupUi();
         cleanupDraw();
-        setPending(true);
       },
-      afterEval: () => {
+      afterEval: ({ code }) => {
+        setPending(false);
+        setLatestCode(code);
+        window.location.hash = '#' + encodeURIComponent(btoa(code));
+      },
+      onEvalError: (err) => {
         setPending(false);
       },
       onToggle: (play) => !play && cleanupDraw(false),
@@ -140,16 +133,14 @@ export function Repl({ embedded = false }) {
   // init code
   useEffect(() => {
     initCode().then((decoded) => {
-      if (!decoded) {
-        setActiveFooter('intro'); // TODO: get rid
-      }
       logger(
         `Welcome to Strudel! ${
           decoded ? `I have loaded the code from the URL.` : `A random code snippet named "${name}" has been loaded!`
         } Press play or hit ctrl+enter to run it!`,
         'highlight',
       );
-      setCode(decoded || randomTune);
+      setCode(decoded || latestCode || randomTune);
+      setPending(false);
     });
   }, []);
 
@@ -159,10 +150,14 @@ export function Repl({ embedded = false }) {
       async (e) => {
         if (e.ctrlKey || e.altKey) {
           if (e.code === 'Enter') {
+            if (getAudioContext().state !== 'running') {
+              alert('please click play to initialize the audio. you can use shortcuts after that!');
+              return;
+            }
             e.preventDefault();
             flash(view);
             await activateCode();
-          } else if (e.code === 'Period') {
+          } else if (e.key === '.') {
             stop();
             e.preventDefault();
           }
@@ -172,15 +167,12 @@ export function Repl({ embedded = false }) {
     ),
   );
 
-  const { settings } = useTheme();
-
   // highlighting
   useHighlighting({
     view,
     pattern,
     active: started && !activeCode?.includes('strudel disable-highlighting'),
     getTime: () => scheduler.now(),
-    color: settings?.foreground,
   });
 
   //
@@ -217,7 +209,8 @@ export function Repl({ embedded = false }) {
     const { code, name } = getRandomTune();
     logger(`[repl] ✨ loading random tune "${name}"`);
     clearCanvas();
-    resetLoadedSamples();
+    resetLoadedSounds();
+    scheduler.setCps(1);
     await prebake(); // declare default samples
     await evaluate(code, false);
   };
@@ -248,23 +241,18 @@ export function Repl({ embedded = false }) {
     }
   };
   const context = {
+    scheduler,
     embedded,
     started,
     pending,
     isDirty,
     lastShared,
     activeCode,
-    activeFooter,
-    setActiveFooter,
     handleChangeCode,
     handleTogglePlay,
     handleUpdate,
     handleShuffle,
     handleShare,
-    isZen,
-    setIsZen,
-    theme,
-    setTheme,
   };
   return (
     // bg-gradient-to-t from-blue-900 to-slate-900
@@ -272,17 +260,24 @@ export function Repl({ embedded = false }) {
     <ReplContext.Provider value={context}>
       <div
         className={cx(
-          'h-screen flex flex-col',
+          'h-full flex flex-col',
           //        'bg-gradient-to-t from-green-900 to-slate-900', //
         )}
       >
+        <Loader active={pending} />
         <Header context={context} />
         <section className="grow flex text-gray-100 relative overflow-auto cursor-text pb-0" id="code">
           <CodeMirror
             theme={themes[theme] || themes.strudelTheme}
             value={code}
+            keybindings={keybindings}
+            fontSize={fontSize}
+            fontFamily={fontFamily}
             onChange={handleChangeCode}
-            onViewChanged={setView}
+            onViewChanged={(v) => {
+              setView(v);
+              // window.editorView = v;
+            }}
             onSelectionChange={handleSelectionChange}
           />
         </section>

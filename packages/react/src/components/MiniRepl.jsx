@@ -7,7 +7,6 @@ import useHighlighting from '../hooks/useHighlighting.mjs';
 import useStrudel from '../hooks/useStrudel.mjs';
 import CodeMirror6, { flash } from './CodeMirror6';
 import { Icon } from './Icon';
-import styles from './MiniRepl.module.css';
 import './style.css';
 import { logger } from '@strudel.cycles/core';
 import useEvent from '../hooks/useEvent.mjs';
@@ -23,7 +22,6 @@ export function MiniRepl({
   punchcard,
   canvasHeight = 200,
   theme,
-  highlightColor,
 }) {
   drawTime = drawTime || (punchcard ? [0, 4] : undefined);
   const evalOnMount = !!drawTime;
@@ -72,7 +70,6 @@ export function MiniRepl({
     pattern,
     active: started && !activeCode?.includes('strudel disable-highlighting'),
     getTime: () => scheduler.now(),
-    color: highlightColor,
   });
 
   // keyboard shortcuts
@@ -85,7 +82,7 @@ export function MiniRepl({
               e.preventDefault();
               flash(view);
               await activateCode();
-            } else if (e.code === 'Period') {
+            } else if (e.key === '.') {
               stop();
               e.preventDefault();
             }
@@ -95,26 +92,6 @@ export function MiniRepl({
       [activateCode, stop, view],
     ),
   );
-
-  // set active pattern on ctrl+enter
-  useLayoutEffect(() => {
-    if (enableKeyboard) {
-      const handleKeyPress = async (e) => {
-        if (e.ctrlKey || e.altKey) {
-          if (e.code === 'Enter') {
-            e.preventDefault();
-            flash(view);
-            await activateCode();
-          } else if (e.code === 'Period') {
-            stop();
-            e.preventDefault();
-          }
-        }
-      };
-      window.addEventListener('keydown', handleKeyPress, true);
-      return () => window.removeEventListener('keydown', handleKeyPress, true);
-    }
-  }, [enableKeyboard, pattern, code, evaluate, stop, view]);
 
   const [log, setLog] = useState([]);
   useLogger(
@@ -131,19 +108,31 @@ export function MiniRepl({
   );
 
   return (
-    <div className={styles.container} ref={ref}>
-      <div className={styles.header}>
-        <div className={styles.buttons}>
-          <button className={cx(styles.button, started ? 'animate-pulse' : '')} onClick={() => togglePlay()}>
+    <div className="overflow-hidden rounded-t-md bg-background border border-lineHighlight" ref={ref}>
+      <div className="flex justify-between bg-lineHighlight">
+        <div className="flex">
+          <button
+            className={cx(
+              'cursor-pointer w-16 flex items-center justify-center p-1 border-r border-lineHighlight text-foreground bg-lineHighlight hover:bg-background',
+              started ? 'animate-pulse' : '',
+            )}
+            onClick={() => togglePlay()}
+          >
             <Icon type={started ? 'stop' : 'play'} />
           </button>
-          <button className={cx(isDirty ? styles.button : styles.buttonDisabled)} onClick={() => activateCode()}>
+          <button
+            className={cx(
+              'w-16 flex items-center justify-center p-1 text-foreground border-lineHighlight bg-lineHighlight',
+              isDirty ? 'text-foreground hover:bg-background cursor-pointer' : 'opacity-50 cursor-not-allowed',
+            )}
+            onClick={() => activateCode()}
+          >
             <Icon type="refresh" />
           </button>
         </div>
-        {error && <div className={styles.error}>{error.message}</div>}
+        {error && <div className="text-right p-1 text-sm text-red-200">{error.message}</div>}
       </div>
-      <div className={styles.body}>
+      <div className="overflow-auto relative">
         {show && <CodeMirror6 value={code} onChange={setCode} onViewChanged={setView} theme={theme} />}
       </div>
       {drawTime && (

@@ -19,10 +19,13 @@ This program is free software: you can redistribute it and/or modify it under th
     this.location_ = location();
   }
 
-  var PatternStub = function(source, alignment)
+  var PatternStub = function(source, alignment, seed)
   {
     this.type_ = "pattern";
-    this.arguments_ = { alignment : alignment};
+    this.arguments_ = { alignment: alignment };
+    if (seed !== undefined) {
+      this.arguments_.seed = seed;
+    }
     this.source_ = source;
   }
 
@@ -48,6 +51,7 @@ This program is free software: you can redistribute it and/or modify it under th
     this.options_ = options;
   }
 
+  var seed = 0;
 }
 
 start = statement
@@ -96,7 +100,7 @@ quote = '"' / "'"
 // ------------------ steps and cycles ---------------------------
 
 // single step definition (e.g bd)
-step_char =  [0-9a-zA-Z~] / "-" / "#" / "." / "^" / "_" / ":"
+step_char =  [0-9a-zA-Z~] / "-" / "#" / "." / "^" / "_"
 step = ws chars:step_char+ ws { return new AtomStub(chars.join("")) }
 
 // define a sub cycle e.g. [1 2, 3 [4]]
@@ -119,7 +123,7 @@ slice = step / sub_cycle / polymeter / slow_sequence
 
 // slice modifier affects the timing/size of a slice (e.g. [a b c]@3)
 // at this point, we assume we can represent them as regular sequence operators
-slice_op = op_weight / op_bjorklund / op_slow / op_fast / op_replicate / op_degrade
+slice_op = op_weight / op_bjorklund / op_slow / op_fast / op_replicate / op_degrade / op_tail
 
 op_weight =  "@" a:number
   { return x => x.options_['weight'] = a }
@@ -137,7 +141,10 @@ op_fast = "*"a:slice
   { return x => x.options_['ops'].push({ type_: "stretch", arguments_ :{ amount:a, type: 'fast' }}) }
 
 op_degrade = "?"a:number?
-  { return x => x.options_['ops'].push({ type_: "degradeBy", arguments_ :{ amount:a } }) }
+  { return x => x.options_['ops'].push({ type_: "degradeBy", arguments_ :{ amount:a, seed: seed++ } }) }
+
+op_tail = ":" s:slice
+  { return x => x.options_['ops'].push({ type_: "tail", arguments_ :{ element:s } }) }
 
 // a slice with an modifier applied i.e [bd@4 sd@3]@2 hh]
 slice_with_ops = s:slice ops:slice_op*
@@ -159,12 +166,12 @@ stack_tail = tail:(comma @sequence)+
 // a choose is a series of pipe-separated sequence, one of which is
 // chosen at random, each cycle
 choose_tail = tail:(pipe @sequence)+
-  { return { alignment: 'rand', list: tail }; }
+  { return { alignment: 'rand', list: tail, seed: seed++ }; }
 
 // if the stack contains only one element, we don't create a stack but return the
 // underlying element
 stack_or_choose = head:sequence tail:(stack_tail / choose_tail)?
-  { if (tail && tail.list.length > 0) { return new PatternStub([head, ...tail.list], tail.alignment); } else { return head; } }
+  { if (tail && tail.list.length > 0) { return new PatternStub([head, ...tail.list], tail.alignment, tail.seed); } else { return head; } }
 
 polymeter_stack = head:sequence tail:stack_tail?
   { return new PatternStub(tail ? [head, ...tail.list] : [head], 'polymeter'); }
@@ -175,7 +182,7 @@ polymeter_stack = head:sequence tail:stack_tail?
 // Experimental haskellish parser begins
 
 // mini-notation = a quoted stack
-mini = ws quote sc:stack_or_choose quote
+mini = ws quote ws sc:stack_or_choose ws quote
   { return sc; }
 
 // ------------------ operators ---------------------------
