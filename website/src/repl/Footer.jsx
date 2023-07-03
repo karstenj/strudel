@@ -9,6 +9,9 @@ import { themes } from './themes.mjs';
 import { useSettings, settingsMap, setActiveFooter, defaultSettings } from '../settings.mjs';
 import { getAudioContext, soundMap } from '@strudel.cycles/webaudio';
 import { useStore } from '@nanostores/react';
+import { FilesTab } from './FilesTab';
+
+const TAURI = window.__TAURI__;
 
 export function Footer({ context }) {
   const footerContent = useRef();
@@ -77,6 +80,7 @@ export function Footer({ context }) {
           <FooterTab name="console" />
           <FooterTab name="reference" />
           <FooterTab name="settings" />
+          {TAURI && <FooterTab name="files" />}
         </div>
         {activeFooter !== '' && (
           <button onClick={() => setActiveFooter('')} className="text-foreground" aria-label="Close Panel">
@@ -91,6 +95,7 @@ export function Footer({ context }) {
           {activeFooter === 'sounds' && <SoundsTab />}
           {activeFooter === 'reference' && <Reference />}
           {activeFooter === 'settings' && <SettingsTab scheduler={context.scheduler} />}
+          {activeFooter === 'files' && <FilesTab />}
         </div>
       )}
     </footer>
@@ -140,7 +145,7 @@ function WelcomeTab() {
       </p>
       <p>
         To learn more about what this all means, check out the{' '}
-        <a href="./learn/getting-started" target="_blank">
+        <a href="./workshop/getting-started" target="_blank">
           interactive tutorial
         </a>
         . Also feel free to join the{' '}
@@ -364,7 +369,15 @@ const fontFamilyOptions = {
 };
 
 function SettingsTab({ scheduler }) {
-  const { theme, keybindings, isLineNumbersDisplayed, isAutoCompletionEnabled, fontSize, fontFamily } = useSettings();
+  const {
+    theme,
+    keybindings,
+    isLineNumbersDisplayed,
+    isAutoCompletionEnabled,
+    isLineWrappingEnabled,
+    fontSize,
+    fontFamily,
+  } = useSettings();
 
   return (
     <div className="text-foreground p-4 space-y-4">
@@ -407,7 +420,7 @@ function SettingsTab({ scheduler }) {
           />
         </FormItem>
       </div>
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
         <FormItem label="Keybindings">
           <ButtonGroup
             value={keybindings}
@@ -424,6 +437,11 @@ function SettingsTab({ scheduler }) {
           label="Enable auto-completion"
           onChange={(cbEvent) => settingsMap.setKey('isAutoCompletionEnabled', cbEvent.target.checked)}
           value={isAutoCompletionEnabled}
+        />
+        <Checkbox
+          label="Enable line wrapping"
+          onChange={(cbEvent) => settingsMap.setKey('isLineWrappingEnabled', cbEvent.target.checked)}
+          value={isLineWrappingEnabled}
         />
       </div>
       <FormItem label="Reset Settings">

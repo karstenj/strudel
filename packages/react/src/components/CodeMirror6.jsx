@@ -20,7 +20,7 @@ const flashField = StateField.define({
     try {
       for (let e of tr.effects) {
         if (e.is(setFlash)) {
-          if (e.value) {
+          if (e.value && tr.newDoc?.length?.length > 0) {
             const mark = Decoration.mark({ attributes: { style: `background-color: #FFCA2880` } });
             flash = Decoration.set([mark.range(0, tr.newDoc.length)]);
           } else {
@@ -88,12 +88,7 @@ const highlightField = StateField.define({
   provide: (f) => EditorView.decorations.from(f),
 });
 
-const staticExtensions = [
-  javascript(),
-  highlightField,
-  flashField,
-  javascriptLanguage.data.of({ autocomplete: strudelAutocomplete }),
-];
+const staticExtensions = [javascript(), highlightField, flashField];
 
 export default function CodeMirror({
   value,
@@ -104,6 +99,7 @@ export default function CodeMirror({
   keybindings,
   isLineNumbersDisplayed,
   isAutoCompletionEnabled,
+  isLineWrappingEnabled,
   fontSize = 18,
   fontFamily = 'monospace',
   options,
@@ -149,8 +145,14 @@ export default function CodeMirror({
       _extensions.push(autocompletion({ override: [] }));
     }
 
+    if (isLineWrappingEnabled) {
+      _extensions.push(EditorView.lineWrapping);
+    }
+
     return _extensions;
-  }, [keybindings, isAutoCompletionEnabled]);
+  }, [keybindings, isAutoCompletionEnabled, isLineWrappingEnabled]);
+
+  const basicSetup = useMemo(() => ({ lineNumbers: isLineNumbersDisplayed }), [isLineNumbersDisplayed]);
 
   return (
     <div style={{ fontSize, fontFamily }} className="w-full">
@@ -161,7 +163,7 @@ export default function CodeMirror({
         onCreateEditor={handleOnCreateEditor}
         onUpdate={handleOnUpdate}
         extensions={extensions}
-        basicSetup={{ lineNumbers: isLineNumbersDisplayed }}
+        basicSetup={basicSetup}
       />
     </div>
   );

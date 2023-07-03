@@ -1582,6 +1582,24 @@ export const range2 = register('range2', function (min, max, pat) {
   return pat.fromBipolar()._range(min, max);
 });
 
+/**
+ * Allows dividing numbers via list notation using ":".
+ * Returns a new pattern with just numbers.
+ * @name ratio
+ * @memberof Pattern
+ * @returns Pattern
+ * @example
+ * ratio("1, 5:4, 3:2").mul(110).freq().s("piano").slow(2)
+ */
+export const ratio = register('ratio', (pat) =>
+  pat.fmap((v) => {
+    if (!Array.isArray(v)) {
+      return v;
+    }
+    return v.slice(1).reduce((acc, n) => acc / n, v[0]);
+  }),
+);
+
 //////////////////////////////////////////////////////////////////////
 // Structural and temporal transformations
 
@@ -2035,7 +2053,7 @@ export const jux = register('jux', function (func, pat) {
  * @example
  * "<0 [2 4]>"
  * .echoWith(4, 1/8, (p,n) => p.add(n*2))
- * .scale('C minor').note().legato(.2)
+ * .scale('C minor').note().clip(.2)
  */
 export const { echoWith, echowith, stutWith, stutwith } = register(
   ['echoWith', 'echowith', 'stutWith', 'stutwith'],
@@ -2185,6 +2203,7 @@ export const velocity = register('velocity', function (velocity, pat) {
 /**
  *
  * Multiplies the hap duration with the given factor.
+ * With samples, `clip` might be a better function to use ([more info](https://github.com/tidalcycles/strudel/pull/598))
  * @name legato
  * @memberof Pattern
  * @example
@@ -2257,7 +2276,7 @@ const _loopAt = function (factor, pat, cps = 1) {
  * s("breaks165").slice(8, "0 1 <2 2*2> 3 [4 0] 5 6 7".every(3, rev)).slow(1.5)
  */
 
-const slice = register(
+export const slice = register(
   'slice',
   function (npat, ipat, opat) {
     return npat.innerBind((n) =>
@@ -2285,7 +2304,7 @@ const slice = register(
  * s("breaks165").splice(8,  "0 1 [2 3 0]@2 3 0@2 7").hurry(0.65)
  */
 
-const splice = register(
+export const splice = register(
   'splice',
   function (npat, ipat, opat) {
     const sliced = slice(npat, ipat, opat);
@@ -2302,7 +2321,10 @@ const splice = register(
   false, // turns off auto-patternification
 );
 
-const { loopAt, loopat } = register(['loopAt', 'loopat'], function (factor, pat) {
+// this function will be redefined in repl.mjs to use the correct cps value.
+// It is still here to work in cases where repl.mjs is not used
+
+export const { loopAt, loopat } = register(['loopAt', 'loopat'], function (factor, pat) {
   return _loopAt(factor, pat, 1);
 });
 
@@ -2319,6 +2341,6 @@ const { loopAt, loopat } = register(['loopAt', 'loopat'], function (factor, pat)
  * s("rhodes").loopAtCps(4,1.5).cps(1.5)
  */
 // TODO - global cps clock
-const { loopAtCps, loopatcps } = register(['loopAtCps', 'loopatcps'], function (factor, cps, pat) {
+export const { loopAtCps, loopatcps } = register(['loopAtCps', 'loopatcps'], function (factor, cps, pat) {
   return _loopAt(factor, pat, cps);
 });
